@@ -1,9 +1,13 @@
+#include <net_connection.h>
+#include <curl/curl.h>
+
 #include "smarthome.h"
 
 typedef struct appdata {
 	Evas_Object *win;
 	Evas_Object *conform;
-	Evas_Object *label;
+	Evas_Object *naviframe;
+	Evas_Object *rs;
 } appdata_s;
 
 static void
@@ -18,6 +22,68 @@ win_back_cb(void *data, Evas_Object *obj, void *event_info)
 	appdata_s *ad = data;
 	/* Let window go to hide state. */
 	elm_win_lower(ad->win);
+}
+
+static Eina_Bool
+_naviframe_pop_cb(void *data, Elm_Object_Item *it)
+{
+	ui_app_exit();
+	return EINA_FALSE;
+}
+
+void
+item_clicked_cb(void *data, Evas_Object *obj, void *event_info)
+{
+	CURL *curl;
+	CURLcode res;
+	curl = curl_easy_init();
+	if(curl) {
+		connection_h connection;
+		int conn_err;
+		conn_err = connection_create(&connection);
+		if (conn_err != CONNECTION_ERROR_NONE) {
+		   // Error handling
+		   return;
+		}
+
+		char *proxy_address;
+		conn_err = connection_get_proxy(connection, CONNECTION_ADDRESS_FAMILY_IPV4, &proxy_address);
+		dlog_print(DLOG_ERROR, LOG_TAG, "proxy url = %s", proxy_address);
+		Eext_Object_Item * item = eext_rotary_selector_selected_item_get(obj);
+		const char *text = eext_rotary_selector_item_part_text_get(item, "selector,main_text");
+		if (!strncmp(text, "car", sizeof("car"))){
+			curl_easy_setopt(curl, CURLOPT_URL, "http://raspberry-pi/door");
+		}
+
+		if (conn_err == CONNECTION_ERROR_NONE && proxy_address) {
+		   curl_easy_setopt(curl, CURLOPT_PROXY, proxy_address);
+		}
+		res = curl_easy_perform(curl);
+		if(res != CURLE_OK){
+			dlog_print(DLOG_ERROR, LOG_TAG, "CurlFail", res);
+			elm_exit();
+		}
+		curl_easy_cleanup(curl);
+		connection_unset_proxy_address_changed_cb(connection);
+		connection_destroy(connection);
+	}
+}
+
+static void
+create_rotary_selector(appdata_s *ad)
+{
+	Elm_Object_Item *nf_it = NULL;
+
+	ad->rs = eext_rotary_selector_add(ad->naviframe);
+	eext_rotary_object_event_activated_set(ad->rs, EINA_TRUE);
+
+	Eext_Object_Item * item;
+	item = eext_rotary_selector_item_append(ad->rs);
+	eext_rotary_selector_item_part_text_set(item, "selector,main_text", "car");
+
+	evas_object_smart_callback_add(ad->rs, "item,clicked", item_clicked_cb, ad);
+	nf_it = elm_naviframe_item_push(ad->naviframe, NULL, NULL, NULL, ad->rs, "empty");
+	elm_naviframe_item_pop_cb_set(nf_it, _naviframe_pop_cb, ad->win);
 }
 
 static void
@@ -43,11 +109,11 @@ create_base_gui(appdata_s *ad)
 	elm_win_resize_object_add(ad->win, ad->conform);
 	evas_object_show(ad->conform);
 
-	/* Label */
-	ad->label = elm_label_add(ad->conform);
-	elm_object_text_set(ad->label, "<align=center>Hello Tizen</align>");
-	evas_object_size_hint_weight_set(ad->label, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
-	elm_object_content_set(ad->conform, ad->label);
+	ad->naviframe = elm_naviframe_add(ad->conform);
+	eext_object_event_callback_add(ad->naviframe, EEXT_CALLBACK_BACK, eext_naviframe_back_cb, NULL);
+	elm_object_content_set(ad->conform, ad->naviframe);
+
+	create_rotary_selector(ad);
 
 	/* Show window after base gui is set up */
 	evas_object_show(ad->win);
