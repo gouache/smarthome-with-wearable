@@ -13,7 +13,8 @@ ADDR = (HOST, PORT)
 
 urls = (
     '/hello', 'hello',
-    '/car', 'car'
+    '/car', 'car',
+    '/cctv', 'cctv'
 )
 
 app = web.application(urls, globals())
@@ -36,6 +37,12 @@ class open_door:
     def GET(self):
         clientSocket.send('#')
         output = "car";
+        return output
+
+class cctv:
+    def GET(self):
+        os.system('python pi-cctv.py &')
+        output = "cctv";
         return output
 
 if __name__ == "__main__":
