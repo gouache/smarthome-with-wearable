@@ -5,7 +5,8 @@
 #define SSID AP_SSID
 #define PASS AP_PASS
 
-#define DST_PORT 8080
+//#define DST_IP
+//#define DST_PORT
 #define PIR_PIN 7
 
 SoftwareSerial esp8266Serial = SoftwareSerial(11, 12);
