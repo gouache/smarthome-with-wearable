@@ -19,7 +19,7 @@ This repository contains a solution that consists of app, simple rest server and
 
 ### Arduino Sketch
 * Car door open
-* Home gate open
+* Home door open
 * TV-IPTV Remote control
 * Air Conditioner Remote control
 * PIR for CCTV
