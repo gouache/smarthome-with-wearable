@@ -10,6 +10,20 @@ typedef struct appdata {
 	Evas_Object *rs;
 } appdata_s;
 
+char *main_menu_names[] = {
+	"Car",
+	"Door",
+	"Light on",
+	"Light off",
+	"TV",
+	"TV CH",
+	"Aircon on",
+	"Aircon off",
+	"Radio",
+	"CCTV",
+	NULL
+};
+
 static void
 win_delete_request_cb(void *data, Evas_Object *obj, void *event_info)
 {
@@ -51,7 +65,9 @@ item_clicked_cb(void *data, Evas_Object *obj, void *event_info)
 		dlog_print(DLOG_ERROR, LOG_TAG, "proxy url = %s", proxy_address);
 		Eext_Object_Item * item = eext_rotary_selector_selected_item_get(obj);
 		const char *text = eext_rotary_selector_item_part_text_get(item, "selector,main_text");
-		if (!strncmp(text, "car", sizeof("car"))){
+		if (!strncmp(text, main_menu_names[0], sizeof(main_menu_names[0]))){
+			curl_easy_setopt(curl, CURLOPT_URL, "http://raspberry-pi/car");
+		} else if (!strncmp(text, main_menu_names[1], sizeof(main_menu_names[1]))){
 			curl_easy_setopt(curl, CURLOPT_URL, "http://raspberry-pi/door");
 		}
 
@@ -73,13 +89,16 @@ static void
 create_rotary_selector(appdata_s *ad)
 {
 	Elm_Object_Item *nf_it = NULL;
+	int idx = 0;
 
 	ad->rs = eext_rotary_selector_add(ad->naviframe);
 	eext_rotary_object_event_activated_set(ad->rs, EINA_TRUE);
 
 	Eext_Object_Item * item;
-	item = eext_rotary_selector_item_append(ad->rs);
-	eext_rotary_selector_item_part_text_set(item, "selector,main_text", "car");
+	for(idx=0; main_menu_names[idx]; idx++) {
+		item = eext_rotary_selector_item_append(ad->rs);
+		eext_rotary_selector_item_part_text_set(item, "selector,main_text", main_menu_names[idx]);
+	}
 
 	evas_object_smart_callback_add(ad->rs, "item,clicked", item_clicked_cb, ad);
 	nf_it = elm_naviframe_item_push(ad->naviframe, NULL, NULL, NULL, ad->rs, "empty");
