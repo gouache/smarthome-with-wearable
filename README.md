@@ -26,3 +26,8 @@ This repository contains a solution that consists of app, simple rest server and
 
 ### Blog
 https://vagabond-voyage.blogspot.com
+
+### Demo
+car : https://www.youtube.com/watch?v=4vxKqIOfE6c
+tv, iptv, light : https://www.youtube.com/watch?v=CQxa62PdXFY
+cctv : https://www.youtube.com/watch?v=q7mGDoCFieE
