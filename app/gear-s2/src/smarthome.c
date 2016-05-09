@@ -1,17 +1,25 @@
+#include <glib.h>
 #include <net_connection.h>
 #include <curl/curl.h>
+#include <bluetooth.h>
 
 #include "smarthome.h"
+
+/* HM-10 Service & Characteristic */
+#define SERVICE "0000ffe0-0000-1000-8000-00805f9b3"
+#define CHARACTERISTIC "0000ffe1-0000-1000-8000-00805f9b34fb"
 
 typedef struct appdata {
 	Evas_Object *win;
 	Evas_Object *conform;
 	Evas_Object *naviframe;
 	Evas_Object *rs;
+	bt_gatt_client_h cli;
 } appdata_s;
 
 char *main_menu_names[] = {
-	"Car",
+	"Car Open",
+	"Car Close",
 	"Door",
 	"Light on",
 	"Light off",
@@ -45,11 +53,250 @@ _naviframe_pop_cb(void *data, Elm_Object_Item *it)
 	return EINA_FALSE;
 }
 
+int
+__bt_gatt_client_set_value(char *type, char *value, bt_gatt_h h)
+{
+	int ret;
+	int s_val;
+	unsigned int u_val;
+	char *buf;
+	int len;
+
+	if (strcasecmp(type, "int8") == 0) {
+		s_val = atoi(value);
+		buf = (char *)&s_val;
+		len = 1;
+	} else if (strcasecmp(type, "int16") == 0) {
+		s_val = atoi(value);
+		buf = (char *)&s_val;
+		len = 2;
+	} else if (strcasecmp(type, "int32") == 0) {
+		s_val = atoi(value);
+		buf = (char *)&s_val;
+		len = 4;
+	} else if (strcasecmp(type, "uint8") == 0) {
+		u_val = strtoul(value, NULL, 10);
+		buf = (char *)&u_val;
+		len = 1;
+	} else if (strcasecmp(type, "uint16") == 0) {
+		u_val = strtoul(value, NULL, 10);
+		buf = (char *)&u_val;
+		len = 2;
+	} else if (strcasecmp(type, "uint32") == 0) {
+		u_val = strtoul(value, NULL, 10);
+		buf = (char *)&u_val;
+		len = 4;
+	} else if (strcasecmp(type, "str") == 0) {
+		buf = value;
+		len = strlen(buf);
+	} else
+		return BT_ERROR_INVALID_PARAMETER;
+
+	ret = bt_gatt_set_value(h, buf, len);
+	if (ret != BT_ERROR_NONE)
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_set_value failed : %d", ret);
+
+	return ret;
+}
+
+void
+__bt_gatt_client_open_next_write_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Write %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+}
+
+void
+__bt_gatt_client_open_write_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Write %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+
+	sleep(1);
+	char wvalue[] = {"AT+PIOB0"};
+	int ret = __bt_gatt_client_set_value("str", wvalue, gatt_handle);
+	if (ret != BT_ERROR_NONE) {
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_set_value failed : %d", ret);
+		return;
+	}
+	ret = bt_gatt_client_write_value(gatt_handle, __bt_gatt_client_open_next_write_complete_cb, NULL);
+
+	if (ret == BT_ERROR_NONE)
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_write_value : Success");
+	else
+		dlog_print(DLOG_INFO, LOG_TAG, "failed bt_gatt_client_write_value : %d", ret);
+}
+
+void
+__bt_gatt_client_open_read_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Read %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+
+	char *rvalue;
+
+	int len;
+	int ret = bt_gatt_get_value(gatt_handle, &rvalue, &len);
+	if (ret != BT_ERROR_NONE) {
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_get_value failed : %d", ret);
+	} else {
+		dlog_print(DLOG_INFO, LOG_TAG, "after value : %d: %s", len, rvalue);
+
+		char wvalue[] = {"AT+PIOB1"};
+		ret = __bt_gatt_client_set_value("str", wvalue, gatt_handle);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_set_value failed : %d", ret);
+			return;
+		}
+		ret = bt_gatt_client_write_value(gatt_handle, __bt_gatt_client_open_write_complete_cb, NULL);
+
+		if (ret == BT_ERROR_NONE)
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_write_value : Success");
+		else
+			dlog_print(DLOG_INFO, LOG_TAG, "failed bt_gatt_client_write_value : %d", ret);
+	}
+}
+
+void
+__bt_gatt_client_close_next_write_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Write %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+}
+
+void
+__bt_gatt_client_close_write_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Write %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+
+	sleep(1);
+	char wvalue[] = {"AT+PIO70"};
+	int ret = __bt_gatt_client_set_value("str", wvalue, gatt_handle);
+	if (ret != BT_ERROR_NONE) {
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_set_value failed : %d", ret);
+		return;
+	}
+	ret = bt_gatt_client_write_value(gatt_handle, __bt_gatt_client_close_next_write_complete_cb, NULL);
+
+	if (ret == BT_ERROR_NONE)
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_write_value : Success");
+	else
+		dlog_print(DLOG_INFO, LOG_TAG, "failed bt_gatt_client_write_value : %d", ret);
+}
+
+void
+__bt_gatt_client_close_read_complete_cb(int result, bt_gatt_h gatt_handle, void *data)
+{
+	char *uuid = NULL;
+	bt_gatt_get_uuid(gatt_handle, &uuid);
+
+	dlog_print(DLOG_INFO, LOG_TAG, "Read %s for uuid : (%s)",
+		result == BT_ERROR_NONE ? "Success" : "Fail", uuid);
+
+	g_free(uuid);
+
+	char *rvalue;
+
+	int len;
+	int ret = bt_gatt_get_value(gatt_handle, &rvalue, &len);
+	if (ret != BT_ERROR_NONE) {
+		dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_get_value failed : %d", ret);
+	} else {
+		dlog_print(DLOG_INFO, LOG_TAG, "after value : %d: %s", len, rvalue);
+
+		char wvalue[] = {"AT+PIO71"};
+		ret = __bt_gatt_client_set_value("str", wvalue, gatt_handle);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_set_value failed : %d", ret);
+			return;
+		}
+		ret = bt_gatt_client_write_value(gatt_handle, __bt_gatt_client_close_write_complete_cb, NULL);
+
+		if (ret == BT_ERROR_NONE)
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_write_value : Success");
+		else
+			dlog_print(DLOG_INFO, LOG_TAG, "failed bt_gatt_client_write_value : %d", ret);
+	}
+}
+
+
 void
 item_clicked_cb(void *data, Evas_Object *obj, void *event_info)
 {
 	CURL *curl;
 	CURLcode res;
+	appdata_s *ad = data;
+
+	bt_gatt_h svc = NULL;
+	bt_gatt_h chr = NULL;
+	int ret;
+
+	Eext_Object_Item * item = eext_rotary_selector_selected_item_get(obj);
+	const char *text = eext_rotary_selector_item_part_text_get(item, "selector,main_text");
+	if (!strncmp(text, "Car Open", sizeof("Car Open"))){
+		ret = bt_gatt_client_get_service(ad->cli, SERVICE, &svc);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_get_service failed : %d", ret);
+		}
+
+		ret = bt_gatt_service_get_characteristic(svc, CHARACTERISTIC, &chr);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_service_get_characteristic failed : %d", ret);
+		}
+
+		ret = bt_gatt_client_read_value(chr, __bt_gatt_client_open_read_complete_cb, NULL);
+		if (ret != BT_ERROR_NONE) {
+		   dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_read_value failed : %d", ret);
+		   return;
+		}
+
+		return;
+	} else if (!strncmp(text, "Car Close", sizeof("Car Close"))){
+		ret = bt_gatt_client_get_service(ad->cli, SERVICE, &svc);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_get_service failed : %d", ret);
+		}
+
+		ret = bt_gatt_service_get_characteristic(svc, CHARACTERISTIC, &chr);
+		if (ret != BT_ERROR_NONE) {
+			dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_service_get_characteristic failed : %d", ret);
+		}
+
+		ret = bt_gatt_client_read_value(chr, __bt_gatt_client_close_read_complete_cb, NULL);
+		if (ret != BT_ERROR_NONE) {
+		   dlog_print(DLOG_INFO, LOG_TAG, "bt_gatt_client_read_value failed : %d", ret);
+		   return;
+		}
+
+		return;
+	}
+
 	curl = curl_easy_init();
 	if(curl) {
 		connection_h connection;
@@ -63,8 +310,6 @@ item_clicked_cb(void *data, Evas_Object *obj, void *event_info)
 		char *proxy_address;
 		conn_err = connection_get_proxy(connection, CONNECTION_ADDRESS_FAMILY_IPV4, &proxy_address);
 		dlog_print(DLOG_ERROR, LOG_TAG, "proxy url = %s", proxy_address);
-		Eext_Object_Item * item = eext_rotary_selector_selected_item_get(obj);
-		const char *text = eext_rotary_selector_item_part_text_get(item, "selector,main_text");
 		if (!strncmp(text, main_menu_names[0], sizeof(main_menu_names[0]))){
 			curl_easy_setopt(curl, CURLOPT_URL, "http://raspberry-pi/car");
 		} else if (!strncmp(text, main_menu_names[1], sizeof(main_menu_names[1]))){
