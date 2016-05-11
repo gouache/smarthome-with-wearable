@@ -9,7 +9,7 @@ This repository contains a solution that consists of app, simple rest server and
 <img src="https://4.bp.blogspot.com/-2QrhoW7wAcI/Vw8auRcLxnI/AAAAAAAA5qk/VQR_l5TM9Y4ienWsuhq_h1tPxSnY_bw_gCLcB/s320/20160414_131654.jpg" width="150">
 
 ## Diagram
-<img src="https://2.bp.blogspot.com/-YcVj8HXtzHg/VxXMPectWdI/AAAAAAAA590/rvCxaCLyRbQWo-KHsQ9LbMqnpvXR-LSegCLcB/s400/diagram.png" width="400">
+<img src="https://2.bp.blogspot.com/-kh1xfYkrgL0/VzKmgioPwZI/AAAAAAAA7kk/2q-ezOrQfh0Rgce1B5w33j6MzHuNjkZFACLcB/s640/diagram.png" width="400">
 
 ### Apps
 * Gear S2 tizen application
