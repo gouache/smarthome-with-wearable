@@ -18,7 +18,7 @@ This repository contains a solution that consists of app, simple rest server and
 * Raspberry Pi or linux server
 
 ### Arduino Sketch
-* Car door open
+* Car door open / close
 * Home door open
 * TV-IPTV Remote control
 * Air Conditioner Remote control
